@@ -1,0 +1,16 @@
+{
+  "name": "@sick-af/engine",
+  "version": "0.1.0",
+  "description": "Image & video to ASCII/dither art rendering engine — 15 modes, Canvas 2D, dependency-free.",
+  "type": "module",
+  "license": "MIT",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "files": ["src"],
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}

@@ -1,0 +1,49 @@
+/* Self-hosted OFL 1.1 fonts. Files sourced from @fontsource/* (npm) and copied
+   into /public/fonts — no runtime CDN or external request. Font *variables*
+   live in tokens.css; this file only declares the faces.
+   - JetBrains Mono: UI + values (the terminal body face)
+   - Silkscreen: display / wordmark (the blocky pixel face)
+   - Inter: long-form only (not used in the app chrome) */
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2'),
+       url('/fonts/jetbrains-mono-latin-400-normal.woff') format('woff');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/fonts/jetbrains-mono-latin-700-normal.woff2') format('woff2'),
+       url('/fonts/jetbrains-mono-latin-700-normal.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'Silkscreen';
+  font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/fonts/silkscreen-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Silkscreen';
+  font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/fonts/silkscreen-latin-700-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/fonts/inter-latin-400-normal.woff2') format('woff2'),
+       url('/fonts/inter-latin-400-normal.woff') format('woff');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal; font-weight: 500; font-display: swap;
+  src: url('/fonts/inter-latin-500-normal.woff2') format('woff2'),
+       url('/fonts/inter-latin-500-normal.woff') format('woff');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/fonts/inter-latin-700-normal.woff2') format('woff2'),
+       url('/fonts/inter-latin-700-normal.woff') format('woff');
+}

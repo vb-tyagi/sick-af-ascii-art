@@ -1,0 +1,10 @@
+packages:
+  - packages/*
+  - apps/*
+
+# esbuild ships a postinstall that links its platform binary. pnpm 11 gates
+# build scripts behind explicit approval; esbuild is trusted (it's vite's bundler).
+allowBuilds:
+  esbuild: true
+onlyBuiltDependencies:
+  - esbuild

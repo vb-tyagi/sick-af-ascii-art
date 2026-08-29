@@ -1,0 +1,76 @@
+/* Design tokens — the single source of truth for SICK AF ASCII ART's identity.
+   Phosphor-terminal: near-black ground, phosphor-green primary with amber and
+   teal as the secondary/tertiary signal colours (per the console references),
+   a warm fire ramp for data. shell.css and sidebar.css consume these --saa-*
+   names; defining them here on :root means one place rethemes the whole app. */
+
+:root {
+  /* --- ground & structure --- */
+  --saa-bg: #060a09;
+  --saa-bg-deep: #030605;
+  --saa-panel: #0a1310;
+  --saa-raised: #0e1a15;
+  --saa-line: #1e2e26;
+  --saa-line-soft: #152019;
+  --saa-track: #16221c;
+
+  /* --- text --- */
+  --saa-text: #d7f2e2;
+  --saa-muted: #6f8c7e;
+  --saa-faint: #445a4e;
+
+  /* --- signal colours (green primary / amber / teal) --- */
+  --saa-accent: #5affa0;
+  --saa-accent-soft: rgba(90, 255, 160, 0.14);
+  --saa-accent-line: rgba(90, 255, 160, 0.4);
+  --saa-amber: #ffc24a;
+  --saa-amber-soft: rgba(255, 194, 74, 0.14);
+  --saa-teal: #4fe0d0;
+  --saa-teal-soft: rgba(79, 224, 208, 0.14);
+  --saa-danger: #ff5f52;
+  --saa-danger-soft: rgba(255, 95, 82, 0.15);
+  --saa-ok: #5affa0;
+  --saa-ok-soft: rgba(90, 255, 160, 0.15);
+
+  /* --- fire ramp (data / signature fills) --- */
+  --fire-1: #ffe08a;
+  --fire-2: #ff9d3c;
+  --fire-3: #e8442a;
+
+  /* --- phosphor glow (used sparingly: wordmark, active states) --- */
+  --saa-glow: 0 0 10px rgba(90, 255, 160, 0.35);
+  --saa-glow-strong: 0 0 18px rgba(90, 255, 160, 0.5);
+  --saa-text-glow: 0 0 8px rgba(90, 255, 160, 0.45);
+
+  /* --- type --- */
+  --font-display: 'Silkscreen', 'JetBrains Mono', ui-monospace, monospace;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --font-ui: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Ground + selection + scrollbar, applied globally so the terminal ground is
+   consistent behind every mounted component. */
+html, body {
+  background: var(--saa-bg);
+  color: var(--saa-text);
+}
+::selection { background: var(--saa-accent-soft); color: var(--saa-text); }
+
+/* Faint CRT scanlines — deliberately subtle (kept low so text stays crisp).
+   Fixed, non-interactive, above content but below nothing it needs to block. */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0) 0,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 12, 6, 0.5) 3px
+  );
+  opacity: 0.22;
+}
+@media (prefers-reduced-motion: reduce) { body::after { opacity: 0.12; } }

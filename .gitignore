@@ -1,0 +1,17 @@
+# dependencies / build output
+node_modules/
+dist/
+.vercel/
+
+# local dev config (Claude Code perms, editor, env)
+.claude/
+.env*
+
+# ── PRIVATE working material — NEVER publish ──────────────────────────
+# reverse-engineering mirror of the original site + teardown + lock doc
+replica-ascii-magic/
+
+# local benchmark inputs (unknown-provenance images) + render outputs
+test-posters/
+benchmark/
+runs/

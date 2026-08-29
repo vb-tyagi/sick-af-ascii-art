@@ -1,0 +1,256 @@
+/**
+ * Application entry — W7.A1.
+ *
+ * The composition root: the one place every module built in isolation is wired
+ * into a running app. It owns no rendering logic of its own — it instantiates
+ * the Renderer, registers all 15 style modes into its registry, mounts the UI
+ * shell (topbar, sidebar, dropzone, loading, toasts), and connects the
+ * SourceLoader so a dropped/pasted/picked file reaches renderer.setSource().
+ *
+ * SEAM STATUS (updated at renderer-pipeline integration):
+ *   - Renderer.render() now runs the full pipeline: source-stage advanced blur
+ *     (sampler preRead) → lights on the sample buffer → masked glyph layer →
+ *     PostFxChain composite over the Backdrop image layer → tint. The chain
+ *     instance below is shared by the renderer AND the sidebar's
+ *     Post-Processing section, so toggles reach the output.
+ *   - The mask's drawing surface is mounted here: an overlay canvas over the
+ *     preview, driven by MaskOverlay, enabled from the sidebar's Mask toggle.
+ *   - REMAINING (feature work, not broken seams): the sidebar has no Dither
+ *     section yet (the dither mode renders with its built-in algorithm/palette
+ *     defaults), and crop/export are topbar stubs.
+ */
+
+import './styles/fonts.css';
+import './styles/tokens.css';
+import './styles/shell.css';
+import './styles/sidebar.css';
+
+import { Renderer, type ModeRenderer } from '@sick-af/engine/renderer';
+import { glyphModes } from '@sick-af/engine/modes/glyph';
+import { ditherModes } from '@sick-af/engine/modes/dither';
+import { shapeModes } from '@sick-af/engine/modes/shape';
+import { blockModes } from '@sick-af/engine/modes/block';
+import { voxelModes } from '@sick-af/engine/modes/voxel';
+import { brailleModes } from '@sick-af/engine/modes/braille';
+import { discoModes } from '@sick-af/engine/modes/disco';
+import { PostFxChain } from '@sick-af/engine/postfx/chain';
+import { MaskOverlay, EMPTY_MASK, type MaskState } from '@sick-af/engine/mask';
+import { SourceLoader } from './io/source-loader';
+import { createSidebar } from './ui/sidebar';
+import { createTopbar } from './ui/topbar';
+import { createDropZone, createLoadingIndicator } from './ui/dropzone';
+import { DEMOS, demoUrl } from './demos';
+import { createToaster } from './ui/toast';
+
+function must<T extends HTMLElement>(id: string): T {
+  const node = document.getElementById(id);
+  if (!node) throw new Error(`main: missing #${id} in index.html`);
+  return node as T;
+}
+
+// Every mode module exposes a { registryKey: renderer } record; merged, these
+// are the 15 style modes of TEARDOWN §3.1.
+const ALL_MODES: Record<string, ModeRenderer> = {
+  ...glyphModes,
+  ...ditherModes,
+  ...shapeModes,
+  ...blockModes,
+  ...voxelModes,
+  ...brailleModes,
+  ...discoModes,
+};
+
+const topbarMount = must('topbar-mount');
+const sidebarMount = must('sidebar-mount');
+const previewArea = must('preview-area');
+const canvas = must<HTMLCanvasElement>('output-canvas');
+
+// Hidden picker driven by both the topbar Upload button and the dropzone.
+const fileInput = document.createElement('input');
+fileInput.type = 'file';
+fileInput.accept = 'image/*,video/*';
+fileInput.style.display = 'none';
+document.body.appendChild(fileInput);
+
+// One chain, shared: the renderer composites through it and the sidebar's
+// Post-Processing section mutates its entries. Two instances would mean
+// toggles that never reach a pixel.
+const postfx = new PostFxChain();
+const renderer = new Renderer({ container: previewArea, canvas, postfx });
+
+let registered = 0;
+for (const [id, mode] of Object.entries(ALL_MODES)) {
+  renderer.registerMode(id, mode);
+  registered++;
+}
+// A short count means a mode module failed to load — fail loud, don't ship a UI
+// whose mode pills dispatch to nothing.
+if (registered !== 15) {
+  throw new Error(`main: expected 15 modes, registered ${registered}`);
+}
+
+const toaster = createToaster(document.body);
+const loading = createLoadingIndicator(previewArea);
+
+const topbar = createTopbar(topbarMount, {
+  onUpload: () => fileInput.click(),
+  onCrop: () => toaster.info('Crop is not wired in this build.'),
+  onExport: () => exportPng(),
+  onMenu: () => toaster.info('SICK AF ASCII ART · 15 modes · Canvas 2D'),
+});
+
+const dropzone = createDropZone(previewArea, {
+  onBrowse: () => fileInput.click(),
+  demos: DEMOS.map((d) => ({ label: d.label, url: demoUrl(d) })),
+  onPickDemo: (url) => void loadDemo(url),
+});
+
+const loader = new SourceLoader({ dropTarget: previewArea });
+loader.bindFileInput(fileInput);
+
+// SourceLoader emits no "decoding started" event; mirror the picker directly.
+fileInput.addEventListener('change', () => {
+  if (fileInput.files?.[0]) loading.show();
+});
+
+loader.on('load', (event) => {
+  renderer.setSource(event.element);
+  renderer.markDirty();
+  loading.hide();
+  dropzone.hide();
+  topbar.setSourceLoaded(true);
+});
+
+loader.on('error', (event) => {
+  loading.hide();
+  toaster.error(event.message);
+});
+
+// Load a demo image (CC0 gallery) through the same unified path as a picked
+// file, so setSource / hide-dropzone / setSourceLoaded all fire identically.
+async function loadDemo(url: string): Promise<void> {
+  loading.show('Loading demo…');
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const name = url.split('/').pop() ?? 'demo.jpg';
+    await loader.loadFile(new File([blob], name, { type: blob.type || 'image/jpeg' }));
+  } catch (err) {
+    loading.hide();
+    toaster.error(`Could not load demo: ${err instanceof Error ? err.message : 'unknown error'}`);
+  }
+}
+
+// Export the current composited frame as a PNG. The renderer's output canvas
+// already holds the full pipeline result (backdrop, glyphs, post-FX, tint), so
+// this is full-fidelity — exactly what's on screen. Multi-scale re-render and
+// JPG are the perfection-pass follow-up; PNG is the right format for the crisp,
+// high-contrast glyphs anyway (JPEG would smear them).
+function exportPng(): void {
+  const canvas = renderer.canvas;
+  if (!canvas.width || !canvas.height) {
+    toaster.info('Load an image or demo first.');
+    return;
+  }
+  canvas.toBlob((blob) => {
+    if (!blob) {
+      toaster.error('Export failed — could not encode the canvas.');
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sick-af-ascii-art-${Date.now()}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toaster.success('Exported PNG.');
+  }, 'image/png');
+}
+
+// Mask drawing surface: a transparent canvas over the preview. Pointer events
+// are enabled only while masking so it never swallows dropzone clicks.
+const maskCanvas = document.createElement('canvas');
+maskCanvas.id = 'mask-overlay';
+maskCanvas.style.position = 'absolute';
+maskCanvas.style.inset = '0';
+maskCanvas.style.pointerEvents = 'none';
+previewArea.appendChild(maskCanvas);
+
+let maskShapes: MaskState = EMPTY_MASK;
+const maskOverlay = new MaskOverlay({
+  canvas: maskCanvas,
+  onChange: (m) => {
+    maskShapes = m;
+    renderer.setOptions({ mask: m });
+    renderer.markDirty();
+  },
+});
+const syncMaskSize = () =>
+  maskOverlay.resize(previewArea.clientWidth, previewArea.clientHeight);
+new ResizeObserver(syncMaskSize).observe(previewArea);
+syncMaskSize();
+
+// The sidebar holds the renderer and pushes render options through its own
+// coalesced setOptions()/markDirty() on every control change. The onChange
+// snapshot wires the one control whose state lives outside the sidebar: the
+// mask toggle, which arms/disarms the overlay above.
+createSidebar(sidebarMount, {
+  renderer,
+  postfx,
+  onChange: (s) => {
+    maskOverlay.setEnabled(s.maskEnabled);
+    maskCanvas.style.pointerEvents = s.maskEnabled ? 'auto' : 'none';
+    renderer.setOptions({ mask: { enabled: s.maskEnabled, shapes: maskShapes.shapes } });
+  },
+});
+
+renderer.start();
+
+// Dev self-test: open /?selftest (optionally ?selftest=<mode>) and a synthetic
+// fixture — gradient, discs, a colour wash — loads straight through
+// renderer.setSource(). Lets a headless driver or a human smoke the LIVE
+// pipeline without touching a file picker. Harmless in production: inert
+// unless the param is present.
+const selftest =
+  new URLSearchParams(location.search).get('selftest') ??
+  ((import.meta as { env?: Record<string, string> }).env?.VITE_SELFTEST ?? null);
+if (selftest !== null) {
+  const c = document.createElement('canvas');
+  c.width = 640;
+  c.height = 400;
+  const x = c.getContext('2d');
+  if (x) {
+    const g = x.createLinearGradient(0, 0, 640, 0);
+    g.addColorStop(0, '#000');
+    g.addColorStop(1, '#fff');
+    x.fillStyle = g;
+    x.fillRect(0, 0, 640, 400);
+    const rg = x.createRadialGradient(320, 200, 10, 320, 200, 180);
+    rg.addColorStop(0, 'rgba(255,64,64,0.9)');
+    rg.addColorStop(1, 'rgba(255,64,64,0)');
+    x.fillStyle = rg;
+    x.fillRect(0, 0, 640, 400);
+    x.fillStyle = '#fff';
+    x.beginPath();
+    x.arc(180, 120, 70, 0, 7);
+    x.fill();
+    x.fillStyle = '#000';
+    x.beginPath();
+    x.arc(460, 280, 60, 0, 7);
+    x.fill();
+    const img = new Image();
+    img.onload = () => {
+      renderer.setSource(img);
+      renderer.markDirty();
+      dropzone.hide();
+      topbar.setSourceLoaded(true);
+      if (selftest && selftest !== '1' && selftest !== 'true') {
+        renderer.setOptions({ mode: selftest });
+      }
+    };
+    img.src = c.toDataURL();
+  }
+}

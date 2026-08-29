@@ -1,0 +1,358 @@
+/* Control sidebar — W7.T27.
+   Our identity: dark-first, phosphor-indigo accent, mono readouts, hairline
+   sections. Not a re-skin of the reference — its layout/colour/order are ours.
+   Fonts come from fonts.css (--font-mono, --font-ui); this file imports none. */
+
+.saa-sidebar {
+  /* palette + type come from tokens.css (:root) */
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 320px;
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 0 24px;
+  background: var(--saa-bg);
+  border-right: 1px solid var(--saa-line);
+  color: var(--saa-text);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+
+.saa-sidebar *,
+.saa-sidebar *::before,
+.saa-sidebar *::after {
+  box-sizing: border-box;
+}
+
+.saa-sidebar::-webkit-scrollbar { width: 10px; }
+.saa-sidebar::-webkit-scrollbar-thumb {
+  background: var(--saa-raised);
+  border: 3px solid var(--saa-bg);
+  border-radius: 6px;
+}
+
+/* --- header ------------------------------------------------------------- */
+
+.saa-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 18px 18px 14px;
+  background: linear-gradient(var(--saa-bg) 70%, transparent);
+  backdrop-filter: blur(2px);
+}
+
+.saa-title {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.saa-badge {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--saa-accent);
+  padding: 2px 6px;
+  border: 1px solid var(--saa-accent-soft);
+  border-radius: 4px;
+}
+
+/* --- section (collapsible) ---------------------------------------------- */
+
+.saa-section {
+  border-top: 1px solid var(--saa-line-soft);
+}
+
+.saa-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.saa-section-head::-webkit-details-marker { display: none; }
+
+.saa-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--saa-muted);
+  transition: color 0.15s ease;
+}
+.saa-section[open] > .saa-section-head .saa-section-title,
+.saa-section-head:hover .saa-section-title { color: var(--saa-text); }
+
+.saa-chev {
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid var(--saa-faint);
+  border-bottom: 1.5px solid var(--saa-faint);
+  transform: rotate(-45deg);
+  transition: transform 0.18s ease, border-color 0.15s ease;
+}
+.saa-section[open] > .saa-section-head .saa-chev { transform: rotate(45deg); }
+.saa-section-head:hover .saa-chev { border-color: var(--saa-accent); }
+
+.saa-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 2px 18px 18px;
+}
+
+/* --- field scaffold ----------------------------------------------------- */
+
+.saa-field { display: flex; flex-direction: column; gap: 7px; }
+
+.saa-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.saa-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--saa-text);
+}
+
+.saa-readout {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--saa-accent);
+  background: var(--saa-accent-soft);
+  padding: 1px 6px;
+  border-radius: 4px;
+  min-width: 34px;
+  text-align: center;
+}
+
+/* --- range -------------------------------------------------------------- */
+
+.saa-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: var(--saa-track);
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+}
+.saa-range:disabled { opacity: 0.4; cursor: default; }
+
+.saa-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--saa-text);
+  border: 3px solid var(--saa-accent);
+  box-shadow: 0 0 0 1px var(--saa-bg), 0 2px 6px rgba(0, 0, 0, 0.5);
+  transition: transform 0.12s ease;
+}
+.saa-range::-webkit-slider-thumb:hover { transform: scale(1.15); }
+.saa-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--saa-text);
+  border: 3px solid var(--saa-accent);
+}
+.saa-range:focus-visible { box-shadow: 0 0 0 2px var(--saa-accent-soft); }
+
+/* --- select / text ------------------------------------------------------ */
+
+.saa-select,
+.saa-text {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--saa-panel);
+  color: var(--saa-text);
+  border: 1px solid var(--saa-line);
+  border-radius: 7px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.saa-text { font-family: var(--font-mono); letter-spacing: 0.02em; }
+.saa-select {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--saa-muted) 50%),
+    linear-gradient(135deg, var(--saa-muted) 50%, transparent 50%);
+  background-position: right 13px center, right 8px center;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 26px;
+  cursor: pointer;
+}
+.saa-select:focus,
+.saa-text:focus {
+  border-color: var(--saa-accent);
+  box-shadow: 0 0 0 3px var(--saa-accent-soft);
+}
+.saa-select option { background: var(--saa-panel); }
+
+/* --- toggle ------------------------------------------------------------- */
+
+.saa-toggle {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.saa-switch {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--saa-track);
+  border: 1px solid var(--saa-line);
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+.saa-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--saa-muted);
+  transition: transform 0.16s ease, background 0.16s ease;
+}
+.saa-switch:checked {
+  background: var(--saa-accent);
+  border-color: var(--saa-accent);
+}
+.saa-switch:checked::after { transform: translateX(16px); background: #fff; }
+.saa-switch:focus-visible { box-shadow: 0 0 0 3px var(--saa-accent-soft); }
+
+/* --- colour swatch ------------------------------------------------------ */
+
+.saa-swatch-wrap { display: flex; align-items: center; gap: 10px; }
+.saa-color {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 40px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--saa-line);
+  border-radius: 7px;
+  background: none;
+  cursor: pointer;
+}
+.saa-color::-webkit-color-swatch-wrapper { padding: 3px; }
+.saa-color::-webkit-color-swatch { border: none; border-radius: 4px; }
+.saa-color::-moz-color-swatch { border: none; border-radius: 4px; }
+
+/* --- pills -------------------------------------------------------------- */
+
+.saa-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.saa-pill {
+  padding: 6px 11px;
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--saa-muted);
+  background: var(--saa-panel);
+  border: 1px solid var(--saa-line);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.13s ease, background 0.13s ease, border-color 0.13s ease;
+}
+.saa-pill:hover { color: var(--saa-text); border-color: var(--saa-faint); }
+.saa-pill.is-active {
+  color: #fff;
+  background: var(--saa-accent);
+  border-color: var(--saa-accent);
+  box-shadow: 0 2px 10px var(--saa-accent-soft);
+}
+.saa-pill:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--saa-accent-soft); }
+
+/* --- post-fx rows ------------------------------------------------------- */
+
+.saa-fx {
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--saa-panel);
+  border: 1px solid var(--saa-line-soft);
+  border-radius: 9px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.saa-fx.is-on {
+  background: var(--saa-raised);
+  border-color: var(--saa-line);
+}
+.saa-fx.is-on .saa-label { color: var(--saa-text); }
+.saa-fx .saa-label { color: var(--saa-muted); }
+
+/* ======================================================================
+   Phosphor-terminal motifs (design pass).
+   ====================================================================== */
+
+.saa-title {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  text-transform: none;
+  color: var(--saa-text);
+  text-shadow: var(--saa-text-glow);
+  line-height: 1.6;
+}
+
+/* section titles get a terminal marker */
+.saa-section-title::before { content: '// '; color: var(--saa-accent); opacity: 0.8; }
+.saa-section[open] > .saa-section-head .saa-section-title { color: var(--saa-text); }
+.saa-section[open] > .saa-section-head .saa-chev { border-color: var(--saa-accent); }
+
+/* readout chip: outlined phosphor */
+.saa-readout { color: var(--saa-accent); background: transparent; border: 1px solid var(--saa-accent-line); text-shadow: var(--saa-text-glow); }
+
+/* range thumb glows */
+.saa-range::-webkit-slider-thumb { background: var(--saa-accent); border-color: var(--saa-accent); box-shadow: 0 0 0 1px var(--saa-bg), var(--saa-glow); }
+.saa-range::-moz-range-thumb { background: var(--saa-accent); border-color: var(--saa-accent); }
+
+/* active pill: dark text on green + glow */
+.saa-pill.is-active { color: #05070a; background: var(--saa-accent); border-color: var(--saa-accent); box-shadow: var(--saa-glow); font-weight: 700; }
+.saa-pill:hover { border-color: var(--saa-accent-line); }
+
+/* switch on: dark knob + glow */
+.saa-switch:checked { background: var(--saa-accent); border-color: var(--saa-accent); box-shadow: var(--saa-glow); }
+.saa-switch:checked::after { background: #05070a; }
+
+/* focus rings + input focus in phosphor */
+.saa-select:focus, .saa-text:focus { border-color: var(--saa-accent); box-shadow: 0 0 0 2px var(--saa-accent-soft), var(--saa-glow); }
+
+/* post-fx active row: green edge */
+.saa-fx.is-on { border-color: var(--saa-accent-line); box-shadow: inset 2px 0 0 var(--saa-accent); }

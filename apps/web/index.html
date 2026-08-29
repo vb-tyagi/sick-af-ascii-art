@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SICK AF ASCII ART — image &amp; video to ASCII art</title>
+    <meta name="description" content="Turn any image or video into ASCII, dither, and block art — 15 render modes, right in your browser. Free, client-side, no signup." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23060a09'/%3E%3Cpolygon points='16,6 26,16 16,26 6,16' fill='%235affa0'/%3E%3C/svg%3E" />
+    <style>
+      /* App shell skeleton only. Component look lives in fonts.css / shell.css /
+         sidebar.css (imported by main.ts); this is layout the components assume:
+         a full-height column (topbar over a sidebar+preview row) and a
+         position:relative preview area for the absolutely-placed dropzone,
+         loading spinner, and output canvas. */
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #060a09;
+      }
+      #app {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+      #topbar-mount {
+        flex: none;
+      }
+      #main {
+        display: flex;
+        flex: 1 1 auto;
+        min-height: 0;
+      }
+      #sidebar-mount {
+        flex: none;
+        min-height: 0;
+      }
+      #preview-area {
+        position: relative;
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        background: #060a09;
+      }
+      #output-canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div id="topbar-mount"></div>
+      <div id="main">
+        <div id="sidebar-mount"></div>
+        <div id="preview-area">
+          <canvas id="output-canvas"></canvas>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
