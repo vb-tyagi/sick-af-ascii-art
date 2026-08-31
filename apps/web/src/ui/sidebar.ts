@@ -51,6 +51,11 @@ const STYLE_MODES: ReadonlyArray<{ id: string; label: string }> = [
   { id: 'braille', label: 'Braille' },
   { id: '3d', label: 'Voxel' },
   { id: 'disco', label: 'Disco' },
+  // Animated modes — self-driving (animated: true), so they need no toggle.
+  { id: 'matrix', label: 'Matrix' },
+  { id: 'shimmer', label: 'Shimmer' },
+  { id: 'wave', label: 'Wave' },
+  { id: 'typewriter', label: 'Typewriter' },
 ];
 
 type CharPreset = 'standard' | 'detailed' | 'minimal';
@@ -135,8 +140,6 @@ export interface SidebarState {
   ditherAlgorithm: DitherAlgorithm;
   /** Registry key from PALETTES, or 'grey4'. Resolved to colours on flush. */
   ditherPalette: string;
-  // Animation
-  animated: boolean;
   // Lights
   lights: LightsOptions;
   // Mask
@@ -168,7 +171,6 @@ export function initialState(): SidebarState {
     advBlurAmount: 35,
     ditherAlgorithm: 'floyd-steinberg',
     ditherPalette: 'mono',
-    animated: false,
     lights: { ...DEFAULT_LIGHTS },
     maskEnabled: false,
   };
@@ -335,7 +337,6 @@ class SidebarController implements Sidebar {
     this.element.appendChild(this.backdropSection());
     this.element.appendChild(this.colorSection());
     this.element.appendChild(this.blurSection());
-    this.element.appendChild(this.animationSection());
     this.element.appendChild(this.lightsSection());
     this.element.appendChild(this.maskSection());
     this.element.appendChild(this.postSection());
@@ -679,14 +680,6 @@ class SidebarController implements Sidebar {
     );
     this.range(body, 'Amount', this.state.advBlurAmount, 0, 100, 1, asInt, (v) => {
       this.state.advBlurAmount = v;
-    });
-    return root;
-  }
-
-  private animationSection(): HTMLElement {
-    const { root, body } = this.section('Animation', false);
-    this.toggle(body, 'Animated ASCII', this.state.animated, (b) => {
-      this.state.animated = b;
     });
     return root;
   }

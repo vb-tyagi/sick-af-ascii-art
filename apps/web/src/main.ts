@@ -33,6 +33,7 @@ import { blockModes } from '@sick-af/engine/modes/block';
 import { voxelModes } from '@sick-af/engine/modes/voxel';
 import { brailleModes } from '@sick-af/engine/modes/braille';
 import { discoModes } from '@sick-af/engine/modes/disco';
+import { animatedModes } from '@sick-af/engine/animate';
 import { PostFxChain } from '@sick-af/engine/postfx/chain';
 import { MaskOverlay, EMPTY_MASK, type MaskState } from '@sick-af/engine/mask';
 import { SourceLoader } from './io/source-loader';
@@ -58,6 +59,9 @@ const ALL_MODES: Record<string, ModeRenderer> = {
   ...voxelModes,
   ...brailleModes,
   ...discoModes,
+  // matrix / shimmer / wave / typewriter. Each declares animated:true, which
+  // keeps the renderer's rAF loop running instead of parking on the dirty flag.
+  ...animatedModes,
 };
 
 const topbarMount = must('topbar-mount');
@@ -78,15 +82,21 @@ document.body.appendChild(fileInput);
 const postfx = new PostFxChain();
 const renderer = new Renderer({ container: previewArea, canvas, postfx });
 
-let registered = 0;
 for (const [id, mode] of Object.entries(ALL_MODES)) {
   renderer.registerMode(id, mode);
-  registered++;
 }
-// A short count means a mode module failed to load — fail loud, don't ship a UI
-// whose mode pills dispatch to nothing.
-if (registered !== 15) {
-  throw new Error(`main: expected 15 modes, registered ${registered}`);
+
+// The core style set of TEARDOWN §3.1. Asserting the NAMES rather than a count
+// means adding a mode never trips this, while a mode module that failed to load
+// still fails loudly — a UI whose pills dispatch to nothing is worse than a
+// blank page, because it looks like it works.
+const REQUIRED_MODES = [
+  'characters', 'dither', 'block-chars', 'dots', 'mixed', 'pixel', 'mosaic',
+  'lego', 'cross', 'diamond', 'lines', 'diagonal', 'braille', '3d', 'disco',
+] as const;
+const missing = REQUIRED_MODES.filter((id) => !(id in ALL_MODES));
+if (missing.length > 0) {
+  throw new Error(`main: mode modules failed to load — missing: ${missing.join(', ')}`);
 }
 
 const toaster = createToaster(document.body);
