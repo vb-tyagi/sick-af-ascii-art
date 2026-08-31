@@ -41,9 +41,20 @@
         min-width: 0;
         overflow: hidden;
         background: #060a09;
+        /* The canvas is sized to the source's aspect ratio, so it is usually
+           smaller than this pane on one axis — centre it instead of letting it
+           sit in the corner. The overlays (dropzone, loading, mask) are
+           absolutely positioned and so ignore this flex context. */
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
       #output-canvas {
         display: block;
+        /* Above the scanline overlay (z 50) so the art the user sees matches
+           the PNG that export reads off this canvas. */
+        position: relative;
+        z-index: 60;
       }
     </style>
   </head>

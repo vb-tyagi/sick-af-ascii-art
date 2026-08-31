@@ -95,6 +95,11 @@ class DropZoneController implements DropZone {
 
     this.element.addEventListener('click', config.onBrowse);
     this.element.addEventListener('keydown', (e: KeyboardEvent) => {
+      // Only the drop zone itself opens the picker. Without this guard, Enter
+      // on a focused demo thumbnail bubbles up here and the preventDefault()
+      // below suppresses that button's own activation — leaving the gallery
+      // unreachable by keyboard.
+      if (e.target !== this.element) return;
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         config.onBrowse();

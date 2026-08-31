@@ -14,12 +14,12 @@
 export interface TopbarActions {
   /** Upload button — the app wires this to the file picker / source loader. */
   onUpload(): void;
-  /** Crop button — opens the crop modal. Disabled until a source is loaded. */
-  onCrop(): void;
+  /** Crop button — opens the crop modal. Not mounted until the modal ships. */
+  onCrop?(): void;
   /** Export button — opens the export modal. Disabled until a source is loaded. */
   onExport(): void;
-  /** Overflow menu (about / feedback / presets). */
-  onMenu(): void;
+  /** Overflow menu (about / feedback / presets). Not mounted until it ships. */
+  onMenu?(): void;
 }
 
 export interface Topbar {
@@ -77,22 +77,18 @@ class TopbarController implements Topbar {
     left.append(mark, word);
 
     // --- center: primary source actions ---
+    // Crop and the overflow menu are deliberately NOT mounted: their features
+    // are not built yet, and a button that only reports its own absence reads
+    // as a broken app. They return when the crop modal and menu ship.
     const center = el('div', 'saa-tb-center');
     const upload = button('saa-tb-btn saa-tb-primary', 'Upload', actions.onUpload, '↑');
-    const crop = button('saa-tb-btn', 'Crop', actions.onCrop, '⌗');
-    this.sourceButtons.push(crop);
-    center.append(upload, crop);
+    center.append(upload);
 
-    // --- right: export + overflow ---
+    // --- right: export ---
     const right = el('div', 'saa-tb-right');
     const exportBtn = button('saa-tb-btn', 'Export', actions.onExport, '⇓');
     this.sourceButtons.push(exportBtn);
-    const menu = el('button', 'saa-tb-btn saa-tb-icon');
-    menu.type = 'button';
-    menu.setAttribute('aria-label', 'Menu');
-    menu.append(el('span', 'saa-tb-glyph', '⋯'));
-    menu.addEventListener('click', actions.onMenu);
-    right.append(exportBtn, menu);
+    right.append(exportBtn);
 
     this.element.append(left, center, right);
     this.setSourceLoaded(false);

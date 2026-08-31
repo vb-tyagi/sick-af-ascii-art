@@ -211,6 +211,10 @@ export class Renderer {
     this.detachVideoListeners();
     this.source = source;
     this.attachVideoListeners();
+    // A new source usually has a different aspect ratio, and the canvas is
+    // fitted to it (see resize) — re-fit before the next frame or the incoming
+    // image is drawn into the outgoing one's box.
+    this.resize();
     this.markDirty();
   }
 
@@ -251,9 +255,49 @@ export class Renderer {
 
   // --- sizing -------------------------------------------------------------
 
+  /**
+   * Source aspect (width / height), or null when there is no source or its
+   * intrinsic size is not known yet (a video before metadata, say). Guarded by
+   * `typeof` checks because the engine also runs headless under node-canvas,
+   * where the DOM constructors do not exist.
+   */
+  private sourceAspect(): number | null {
+    const s = this.source;
+    if (!s) return null;
+
+    let sw = 0;
+    let sh = 0;
+    if (typeof HTMLVideoElement !== 'undefined' && s instanceof HTMLVideoElement) {
+      sw = s.videoWidth;
+      sh = s.videoHeight;
+    } else if (typeof HTMLImageElement !== 'undefined' && s instanceof HTMLImageElement) {
+      sw = s.naturalWidth || s.width;
+      sh = s.naturalHeight || s.height;
+    } else {
+      sw = (s as { width?: number }).width ?? 0;
+      sh = (s as { height?: number }).height ?? 0;
+    }
+
+    return sw > 0 && sh > 0 ? sw / sh : null;
+  }
+
   private resize(): void {
-    const w = this.container.clientWidth;
-    const h = this.container.clientHeight;
+    const availW = this.container.clientWidth;
+    const availH = this.container.clientHeight;
+    if (availW === 0 || availH === 0) return;
+
+    // Fit the canvas to the source's aspect ratio inside the available area
+    // instead of filling it. Filling stretches every source whose ratio differs
+    // from the preview pane — a 2:3 portrait photo in a landscape pane comes
+    // out visibly squashed. With no source there is nothing to fit, so the
+    // canvas takes the whole area.
+    const aspect = this.sourceAspect();
+    let w = availW;
+    let h = availH;
+    if (aspect !== null) {
+      if (availW / availH > aspect) w = Math.max(1, Math.round(availH * aspect));
+      else h = Math.max(1, Math.round(availW / aspect));
+    }
     if (w === 0 || h === 0) return;
 
     // Clamp: beyond 2x the extra glyphs cost real CPU for no visible gain.

@@ -179,7 +179,9 @@
   position: fixed;
   right: 18px;
   bottom: 18px;
-  z-index: 20;
+  /* Above both the scanline overlay (50) and the output canvas (60), which the
+     toast area overlaps in the bottom-right corner. */
+  z-index: 100;
   display: flex;
   flex-direction: column;
   gap: 10px;

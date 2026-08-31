@@ -94,9 +94,7 @@ const loading = createLoadingIndicator(previewArea);
 
 const topbar = createTopbar(topbarMount, {
   onUpload: () => fileInput.click(),
-  onCrop: () => toaster.info('Crop is not wired in this build.'),
   onExport: () => exportPng(),
-  onMenu: () => toaster.info('SICK AF ASCII ART · 15 modes · Canvas 2D'),
 });
 
 const dropzone = createDropZone(previewArea, {
@@ -162,10 +160,11 @@ function exportPng(): void {
     const a = document.createElement('a');
     a.href = url;
     a.download = `sick-af-ascii-art-${Date.now()}.png`;
-    document.body.appendChild(a);
     a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    // Revoking synchronously races the browser's read of the object URL — some
+    // engines have not started the download yet and it silently fails. Hand the
+    // URL back on a later tick instead; the delay costs nothing.
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
     toaster.success('Exported PNG.');
   }, 'image/png');
 }
@@ -175,7 +174,6 @@ function exportPng(): void {
 const maskCanvas = document.createElement('canvas');
 maskCanvas.id = 'mask-overlay';
 maskCanvas.style.position = 'absolute';
-maskCanvas.style.inset = '0';
 maskCanvas.style.pointerEvents = 'none';
 previewArea.appendChild(maskCanvas);
 
@@ -188,9 +186,21 @@ const maskOverlay = new MaskOverlay({
     renderer.markDirty();
   },
 });
-const syncMaskSize = () =>
-  maskOverlay.resize(previewArea.clientWidth, previewArea.clientHeight);
+// The output canvas is fitted to the source's aspect ratio and centred, so it
+// is usually smaller than the pane. The mask must track the CANVAS rect, not
+// the pane, or drawn shapes land offset from the art they are meant to clip.
+const syncMaskSize = () => {
+  const c = renderer.canvas;
+  const w = c.clientWidth || previewArea.clientWidth;
+  const h = c.clientHeight || previewArea.clientHeight;
+  maskCanvas.style.left = `${c.offsetLeft}px`;
+  maskCanvas.style.top = `${c.offsetTop}px`;
+  maskCanvas.style.width = `${w}px`;
+  maskCanvas.style.height = `${h}px`;
+  maskOverlay.resize(w, h);
+};
 new ResizeObserver(syncMaskSize).observe(previewArea);
+new ResizeObserver(syncMaskSize).observe(renderer.canvas);
 syncMaskSize();
 
 // The sidebar holds the renderer and pushes render options through its own

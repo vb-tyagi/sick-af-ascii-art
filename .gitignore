@@ -1,7 +1,6 @@
 # dependencies / build output
 node_modules/
 dist/
-.vercel/
 
 # local dev config (Claude Code perms, editor, env)
 .claude/

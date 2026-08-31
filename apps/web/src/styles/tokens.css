@@ -59,11 +59,15 @@ html, body {
 
 /* Faint CRT scanlines — deliberately subtle (kept low so text stays crisp).
    Fixed, non-interactive, above content but below nothing it needs to block. */
+/* z-index 50 keeps the scanlines over the chrome but UNDER the output canvas
+   (60) and toasts (100). The canvas must stay clear of them: the exported PNG
+   is read straight off it, so anything painted on top would make the preview
+   disagree with the file the user downloads. */
 body::after {
   content: '';
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  z-index: 50;
   pointer-events: none;
   background: repeating-linear-gradient(
     0deg,
