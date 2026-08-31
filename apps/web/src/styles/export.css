@@ -81,3 +81,29 @@
 
 .saa-export-pill:focus-visible,
 .saa-export-go:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--saa-accent-soft); }
+
+/* Animated-format note (capability / caps) and the cancel affordance. */
+.saa-export-note {
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--saa-faint);
+  text-align: center;
+}
+.saa-export-note.is-hidden { display: none; }
+
+.saa-export-cancel {
+  padding: 6px 10px;
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  color: var(--saa-muted);
+  background: transparent;
+  border: 1px solid var(--saa-line);
+  border-radius: 7px;
+  cursor: pointer;
+}
+.saa-export-cancel:hover { color: var(--saa-text); border-color: var(--saa-faint); }
+.saa-export-cancel.is-hidden { display: none; }
+
+.saa-export-go:disabled { opacity: 0.75; cursor: progress; }
+.saa-export-pill:disabled { opacity: 0.45; cursor: not-allowed; }

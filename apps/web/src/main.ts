@@ -40,7 +40,13 @@ import { PostFxChain } from '@sick-af/engine/postfx/chain';
 import { MaskOverlay, EMPTY_MASK, type MaskState } from '@sick-af/engine/mask';
 import type { SourceMedia, SamplerTransform } from '@sick-af/engine/sample';
 import { createCropModal } from './ui/crop-modal';
-import { createExportPopover } from './ui/export-popover';
+import {
+  createExportPopover,
+  ANIM_FRAMES,
+  ANIM_FPS,
+} from './ui/export-popover';
+import { exportGif } from './io/export-gif';
+import { exportVideo, detectVideoSupport } from './io/export-video';
 import {
   encodeCanvas,
   downloadBlob,
@@ -181,9 +187,40 @@ async function loadDemo(url: string): Promise<void> {
 // picture on screen at higher resolution — never an upscaled bitmap, and never
 // a second pipeline that could drift from the preview.
 
+const videoSupport = detectVideoSupport();
+
+/**
+ * Animated captures run in REAL TIME (see captureAnimatedFrames), and every
+ * frame is a full pipeline render, so 4x x 48 frames is minutes of work and
+ * gigabytes of RGBA. Capping at 2x keeps them feasible — and the cap is stated
+ * in the popover rather than applied behind the user's back.
+ */
+const MAX_ANIMATED_SCALE = 2;
+
+let animatedAbort: AbortController | null = null;
+let cancelGif: (() => void) | null = null;
+
 const exportPopover = createExportPopover({
   baseSize: () => renderer.logicalSize,
+  formatNote: (format) => {
+    if (format === 'mp4') {
+      if (!videoSupport.mp4 && !videoSupport.webm) return 'Not supported in this browser.';
+      return videoSupport.note ?? `Capped at ${MAX_ANIMATED_SCALE}× · animated modes and video only.`;
+    }
+    if (format === 'gif') {
+      return `Capped at ${MAX_ANIMATED_SCALE}× · animated modes and video only.`;
+    }
+    return null;
+  },
+  onCancel: () => {
+    animatedAbort?.abort();
+    cancelGif?.();
+  },
   onExport: async (format, scale) => {
+    if (format === 'gif' || format === 'mp4') {
+      await runAnimatedExport(format, Math.min(scale, MAX_ANIMATED_SCALE) as ExportScale);
+      return;
+    }
     await runExport(format, scale);
   },
 });
@@ -211,6 +248,118 @@ async function runExport(format: ExportFormat, scale: ExportScale): Promise<void
     toaster.success(`Exported ${format.toUpperCase()} at ${canvas.width}x${canvas.height}.`);
   } catch (err) {
     toaster.error(`Export failed: ${err instanceof Error ? err.message : 'unknown error'}`);
+  }
+}
+
+/**
+ * Render one frame through the shared pipeline.
+ *
+ * `opaque` lays white down first: GIF carries only 1-bit alpha and MP4 none at
+ * all, so a transparent backdrop would otherwise come out black.
+ */
+function renderFrameCanvas(scale: ExportScale, opaque: boolean): HTMLCanvasElement {
+  const frame = renderer.renderToCanvas(scale);
+  if (!opaque) return frame;
+
+  const flat = document.createElement('canvas');
+  flat.width = frame.width;
+  flat.height = frame.height;
+  const fctx = flat.getContext('2d');
+  if (!fctx) throw new Error('2D context unavailable for frame flattening');
+  fctx.fillStyle = '#ffffff';
+  fctx.fillRect(0, 0, flat.width, flat.height);
+  fctx.drawImage(frame, 0, 0);
+  return flat;
+}
+
+/**
+ * Hold until frame `index` is due on the wall clock.
+ *
+ * The animated modes are pure functions of performance.now(), and a video plays
+ * on its own clock, so real elapsed time IS the animation state. Capturing as
+ * fast as possible would yield N nearly identical frames.
+ */
+function awaitFrameTime(startMs: number, index: number, frameDelayMs: number): Promise<void> {
+  const due = startMs + index * frameDelayMs;
+  const wait = due - performance.now();
+  return wait > 0 ? new Promise((r) => setTimeout(r, wait)) : Promise.resolve();
+}
+
+async function runAnimatedExport(format: 'gif' | 'mp4', scale: ExportScale): Promise<void> {
+  const base = renderer.logicalSize;
+  if (!currentSource || !base.width || !base.height) {
+    toaster.info('Load an image or demo first.');
+    return;
+  }
+
+  const frameDelayMs = 1000 / ANIM_FPS;
+  const startMs = performance.now();
+  const report = (phase: string, done: number, total: number) =>
+    exportPopover.setProgress(`${phase} ${Math.round((done / total) * 100)}%`);
+
+  try {
+    if (format === 'gif') {
+      const probe = renderFrameCanvas(scale, true);
+      const width = probe.width;
+      const height = probe.height;
+
+      const handle = exportGif({
+        frameCount: ANIM_FRAMES,
+        frameDelayMs,
+        width,
+        height,
+        captureFrame: async (index) => {
+          await awaitFrameTime(startMs, index, frameDelayMs);
+          const c = renderFrameCanvas(scale, true);
+          const ctx = c.getContext('2d');
+          if (!ctx) throw new Error('2D context unavailable for GIF frame');
+          return ctx.getImageData(0, 0, width, height).data;
+        },
+        onProgress: (p) => report(p.phase === 'capturing' ? 'Capturing' : 'Encoding', p.completed, p.total),
+      });
+      cancelGif = handle.cancel;
+
+      const blob = await handle.result;
+      downloadBlob(blob, `sick-af-ascii-art-${Date.now()}.gif`);
+      toaster.success(`Exported GIF at ${width}×${height}.`);
+      return;
+    }
+
+    // H.264 requires even dimensions; round down rather than fail at encode.
+    const probe = renderFrameCanvas(scale, true);
+    const width = probe.width - (probe.width % 2);
+    const height = probe.height - (probe.height % 2);
+
+    animatedAbort = new AbortController();
+    const result = await exportVideo({
+      width,
+      height,
+      frameCount: ANIM_FRAMES,
+      fps: ANIM_FPS,
+      signal: animatedAbort.signal,
+      drawFrame: async (ctx, index) => {
+        await awaitFrameTime(startMs, index, frameDelayMs);
+        const c = renderFrameCanvas(scale, true);
+        ctx.drawImage(c, 0, 0, width, height);
+      },
+      onProgress: (p) => report('Encoding', p.completed, p.total),
+    });
+
+    downloadBlob(result.blob, `sick-af-ascii-art-${Date.now()}.${result.format}`);
+    if (result.degradedFrom) {
+      // Never swap formats silently — the user asked for MP4.
+      toaster.info(`${result.degradedFrom.toUpperCase()} unavailable — exported ${result.format.toUpperCase()} instead.`);
+    } else {
+      toaster.success(`Exported ${result.format.toUpperCase()} at ${width}×${height}.`);
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'unknown error';
+    if (/abort/i.test(msg)) toaster.info('Export cancelled.');
+    else toaster.error(`Export failed: ${msg}`);
+  } finally {
+    animatedAbort = null;
+    cancelGif = null;
+    exportPopover.setProgress(null);
   }
 }
 
