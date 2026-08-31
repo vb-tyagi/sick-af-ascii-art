@@ -209,6 +209,15 @@ export interface SidebarConfig {
    * backdrop, blur, lights, mask, animation, the character toggles.
    */
   onChange?: (state: Readonly<SidebarState>) => void;
+  /**
+   * Curated looks, injected rather than imported: `recipes.ts` already imports
+   * this module, so importing it back would close a cycle. The app owns that
+   * dependency and hands the list down.
+   */
+  presets?: ReadonlyArray<{ id: string; name: string; blurb: string }>;
+  onPickPreset?(id: string): void;
+  /** Copy a share link encoding the whole current look. */
+  onCopyShareLink?(): void;
 }
 
 type Formatter = (v: number) => string;
@@ -232,6 +241,13 @@ const el = <K extends keyof HTMLElementTagNameMap>(
 export interface Sidebar {
   readonly element: HTMLElement;
   getState(): Readonly<SidebarState>;
+  /**
+   * Replace the whole control state and rebuild the controls to match. Applying
+   * a recipe mutates state wholesale, and every control renders its value at
+   * build time — without a rebuild the canvas would update while the sidebar
+   * kept showing the old numbers.
+   */
+  setState(next: SidebarState): void;
   destroy(): void;
 }
 
@@ -241,6 +257,9 @@ class SidebarController implements Sidebar {
   private readonly renderer: Renderer;
   private readonly postfx: PostFxChain;
   private readonly onChange?: (s: Readonly<SidebarState>) => void;
+  private readonly presets: ReadonlyArray<{ id: string; name: string; blurb: string }>;
+  private readonly onPickPreset?: (id: string) => void;
+  private readonly onCopyShareLink?: () => void;
   private readonly state = initialState();
 
   private frameHandle = 0;
@@ -253,6 +272,9 @@ class SidebarController implements Sidebar {
     this.renderer = config.renderer;
     this.postfx = config.postfx;
     this.onChange = config.onChange;
+    this.presets = config.presets ?? [];
+    this.onPickPreset = config.onPickPreset;
+    this.onCopyShareLink = config.onCopyShareLink;
 
     this.element = el('aside', 'saa-sidebar');
     this.element.setAttribute('aria-label', 'SICK AF ASCII ART controls');
@@ -263,6 +285,15 @@ class SidebarController implements Sidebar {
 
   getState(): Readonly<SidebarState> {
     return this.state;
+  }
+
+  setState(next: SidebarState): void {
+    Object.assign(this.state, next);
+    // The grid solve keys off the font, which a recipe can change.
+    this.fontDirty = true;
+    this.element.replaceChildren();
+    this.build();
+    this.schedule();
   }
 
   destroy(): void {
@@ -330,6 +361,8 @@ class SidebarController implements Sidebar {
     header.append(el('h1', 'saa-title', 'SICK AF ASCII ART'));
     this.element.appendChild(header);
 
+    const recipes = this.recipesSection();
+    if (recipes) this.element.appendChild(recipes);
     this.element.appendChild(this.styleSection());
     this.element.appendChild(this.ditherSection());
     this.element.appendChild(this.charactersSection());
@@ -496,6 +529,38 @@ class SidebarController implements Sidebar {
   }
 
   // --- sections -----------------------------------------------------------
+
+  /**
+   * Curated looks + a share link. Rendered only when the app injects presets,
+   * so the sidebar keeps working standalone (and in tests) without them.
+   */
+  private recipesSection(): HTMLElement | null {
+    if (this.presets.length === 0 && !this.onCopyShareLink) return null;
+    const { root, body } = this.section('Recipes', true);
+
+    if (this.presets.length > 0) {
+      const grid = el('div', 'saa-recipes');
+      for (const p of this.presets) {
+        const b = el('button', 'saa-recipe');
+        b.type = 'button';
+        b.title = p.blurb;
+        b.append(el('span', 'saa-recipe-name', p.name));
+        b.addEventListener('click', () => this.onPickPreset?.(p.id));
+        grid.appendChild(b);
+      }
+      body.appendChild(grid);
+    }
+
+    if (this.onCopyShareLink) {
+      const share = el('button', 'saa-share');
+      share.type = 'button';
+      share.append(el('span', undefined, 'Copy share link'));
+      share.addEventListener('click', () => this.onCopyShareLink?.());
+      body.appendChild(share);
+    }
+
+    return root;
+  }
 
   private styleSection(): HTMLElement {
     const { root, body } = this.section('Style', true);

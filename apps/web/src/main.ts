@@ -37,7 +37,15 @@ import { animatedModes } from '@sick-af/engine/animate';
 import { PostFxChain } from '@sick-af/engine/postfx/chain';
 import { MaskOverlay, EMPTY_MASK, type MaskState } from '@sick-af/engine/mask';
 import { SourceLoader } from './io/source-loader';
-import { createSidebar } from './ui/sidebar';
+import { createSidebar, type SidebarState } from './ui/sidebar';
+import {
+  RECIPE_PRESETS,
+  findPreset,
+  applyRecipe,
+  captureRecipe,
+  recipeShareUrl,
+  loadRecipeFromHashOnBoot,
+} from './ui/recipes';
 import { createTopbar } from './ui/topbar';
 import { createDropZone, createLoadingIndicator } from './ui/dropzone';
 import { DEMOS, demoUrl } from './demos';
@@ -217,15 +225,55 @@ syncMaskSize();
 // coalesced setOptions()/markDirty() on every control change. The onChange
 // snapshot wires the one control whose state lives outside the sidebar: the
 // mask toggle, which arms/disarms the overlay above.
-createSidebar(sidebarMount, {
+const sidebar = createSidebar(sidebarMount, {
   renderer,
   postfx,
+  presets: RECIPE_PRESETS.map((p) => ({ id: p.id, name: p.name, blurb: p.blurb })),
+  onPickPreset: (id) => {
+    const preset = findPreset(id);
+    if (!preset) return;
+    // applyRecipe mutates the draft and the shared chain; setState then rebuilds
+    // the controls so they show what the canvas is actually rendering.
+    const draft = { ...sidebar.getState() } as SidebarState;
+    applyRecipe(draft, postfx, preset.build());
+    sidebar.setState(draft);
+    toaster.success(`Loaded “${preset.name}”.`);
+  },
+  onCopyShareLink: () => void copyShareLink(),
   onChange: (s) => {
     maskOverlay.setEnabled(s.maskEnabled);
     maskCanvas.style.pointerEvents = s.maskEnabled ? 'auto' : 'none';
     renderer.setOptions({ mask: { enabled: s.maskEnabled, shapes: maskShapes.shapes } });
   },
 });
+
+/**
+ * Encode the whole look into the URL and copy it. The image itself is never
+ * uploaded — a link carries settings only, so the recipient applies the look to
+ * their own source.
+ */
+async function copyShareLink(): Promise<void> {
+  const url = recipeShareUrl(captureRecipe(sidebar.getState(), postfx));
+  try {
+    await navigator.clipboard.writeText(url);
+    toaster.success('Share link copied.');
+  } catch {
+    // Clipboard access needs a secure context and can be refused; putting the
+    // link in the address bar still lets the user copy it by hand.
+    location.hash = new URL(url).hash.slice(1);
+    toaster.info('Link is in the address bar — copy it from there.');
+  }
+}
+
+// A shared link boots straight into its look.
+{
+  const draft = { ...sidebar.getState() } as SidebarState;
+  const loaded = loadRecipeFromHashOnBoot(draft, postfx);
+  if (loaded) {
+    sidebar.setState(draft);
+    toaster.info('Loaded the shared look from this link.');
+  }
+}
 
 renderer.start();
 

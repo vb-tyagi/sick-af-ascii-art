@@ -356,3 +356,51 @@
 
 /* post-fx active row: green edge */
 .saa-fx.is-on { border-color: var(--saa-accent-line); box-shadow: inset 2px 0 0 var(--saa-accent); }
+
+/* --- recipes (curated looks + share link) -------------------------------- */
+
+.saa-recipes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.saa-recipe {
+  padding: 8px 10px;
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  font-weight: 500;
+  text-align: left;
+  color: var(--saa-muted);
+  background: var(--saa-panel);
+  border: 1px solid var(--saa-line);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: color 0.13s ease, background 0.13s ease, border-color 0.13s ease;
+}
+.saa-recipe:hover {
+  color: var(--saa-text);
+  border-color: var(--saa-accent-line);
+  background: var(--saa-raised);
+}
+.saa-recipe:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--saa-accent-soft); }
+
+.saa-recipe-name { display: block; }
+
+.saa-share {
+  margin-top: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--saa-accent);
+  background: transparent;
+  border: 1px dashed var(--saa-accent-line);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.13s ease, color 0.13s ease;
+}
+.saa-share:hover { background: var(--saa-accent-soft); color: var(--saa-text-glow); }
+.saa-share:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--saa-accent-soft); }
