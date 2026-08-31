@@ -221,8 +221,13 @@ export class Renderer {
   setOptions(patch: Partial<RenderOptions>): void {
     const fontChanged =
       patch.font !== undefined && patch.font !== this.opts.font;
+    const transformChanged =
+      patch.transform !== undefined && patch.transform !== this.opts.transform;
     this.opts = { ...this.opts, ...patch };
     if (fontChanged) this.solve();
+    // A crop or rotation changes the effective aspect ratio the canvas is
+    // fitted to; resize() re-solves the grid itself.
+    if (transformChanged) this.resize();
     this.markDirty();
   }
 
@@ -276,6 +281,20 @@ export class Renderer {
     } else {
       sw = (s as { width?: number }).width ?? 0;
       sh = (s as { height?: number }).height ?? 0;
+    }
+
+    // A crop replaces the effective frame, and a quarter-turn swaps its axes.
+    // Without this a square crop of a portrait would still be fitted to the
+    // portrait's ratio and render letterboxed inside its own crop.
+    const t = this.opts.transform;
+    if (t?.crop && t.crop.w > 0 && t.crop.h > 0) {
+      sw = t.crop.w;
+      sh = t.crop.h;
+    }
+    if (t?.rotate === 90 || t?.rotate === 270) {
+      const swap = sw;
+      sw = sh;
+      sh = swap;
     }
 
     return sw > 0 && sh > 0 ? sw / sh : null;

@@ -1,0 +1,171 @@
+/* Crop & Rotate modal — W7.T29.
+   The modal shipped without a stylesheet because it was never mounted; these
+   are its first styles. Same phosphor identity as the rest of the shell.
+   z-index 200 clears the scanline overlay (50), the output canvas (60) and the
+   toasts (100) — a modal that renders under the art is not a modal. */
+
+.saa-crop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(2, 6, 5, 0.78);
+  backdrop-filter: blur(3px);
+  font-family: var(--font-ui);
+  color: var(--saa-text);
+}
+.saa-crop-overlay.is-hidden { display: none; }
+
+.saa-crop-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(880px, 100%);
+  max-height: 100%;
+  padding: 18px;
+  background: var(--saa-bg);
+  border: 1px solid var(--saa-accent-line);
+  border-radius: 12px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--saa-line-soft);
+}
+
+.saa-crop-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.saa-crop-title {
+  margin: 0;
+  font-family: var(--font-display, var(--font-mono));
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--saa-accent);
+}
+.saa-crop-close {
+  width: 28px;
+  height: 28px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1;
+  color: var(--saa-muted);
+  background: transparent;
+  border: 1px solid var(--saa-line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.saa-crop-close:hover { color: var(--saa-text); border-color: var(--saa-faint); }
+
+/* The canvas is sized in script; the stage just centres and bounds it. */
+.saa-crop-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: 10px;
+  background: var(--saa-panel);
+  border: 1px solid var(--saa-line-soft);
+  border-radius: 9px;
+  overflow: hidden;
+}
+.saa-crop-canvas {
+  display: block;
+  max-width: 100%;
+  max-height: min(56vh, 520px);
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.saa-crop-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.saa-crop-ratios { display: flex; flex: 1 1 auto; flex-wrap: wrap; gap: 6px; }
+.saa-crop-pill {
+  padding: 5px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--saa-muted);
+  background: var(--saa-panel);
+  border: 1px solid var(--saa-line);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.13s ease, background 0.13s ease, border-color 0.13s ease;
+}
+.saa-crop-pill:hover { color: var(--saa-text); border-color: var(--saa-faint); }
+.saa-crop-pill.is-active {
+  color: var(--saa-bg);
+  background: var(--saa-accent);
+  border-color: var(--saa-accent);
+}
+
+/* NOTE the naming: `saa-crop-rotate` is the ROW, `saa-crop-rot` are the two
+   BUTTONS inside it — the reverse of what the names suggest. Verified against
+   the live DOM; styling them the other way round collapses the row to ~25px and
+   stacks the buttons vertically. */
+.saa-crop-rotate {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.saa-crop-rot {
+  width: 30px;
+  height: 30px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--saa-text);
+  background: var(--saa-panel);
+  border: 1px solid var(--saa-line);
+  border-radius: 7px;
+  cursor: pointer;
+}
+.saa-crop-rot:hover { border-color: var(--saa-accent-line); color: var(--saa-accent); }
+.saa-crop-rotval,
+.saa-crop-dims {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--saa-muted);
+}
+
+.saa-crop-footer { display: flex; justify-content: flex-end; gap: 8px; }
+.saa-crop-btn {
+  padding: 8px 16px;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.13s ease, border-color 0.13s ease, color 0.13s ease;
+}
+.saa-crop-cancel {
+  color: var(--saa-muted);
+  background: transparent;
+  border: 1px solid var(--saa-line);
+}
+.saa-crop-cancel:hover { color: var(--saa-text); border-color: var(--saa-faint); }
+.saa-crop-apply {
+  color: var(--saa-bg);
+  background: var(--saa-accent);
+  border: 1px solid var(--saa-accent);
+  box-shadow: 0 0 14px var(--saa-glow, transparent);
+}
+.saa-crop-apply:hover { filter: brightness(1.08); }
+.saa-crop-btn:focus-visible,
+.saa-crop-pill:focus-visible,
+.saa-crop-rot:focus-visible,
+.saa-crop-close:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--saa-accent-soft);
+}

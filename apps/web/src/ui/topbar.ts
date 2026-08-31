@@ -77,12 +77,17 @@ class TopbarController implements Topbar {
     left.append(mark, word);
 
     // --- center: primary source actions ---
-    // Crop and the overflow menu are deliberately NOT mounted: their features
-    // are not built yet, and a button that only reports its own absence reads
-    // as a broken app. They return when the crop modal and menu ship.
+    // The overflow menu is still NOT mounted: a button that only reports its own
+    // absence reads as a broken app. Crop is mounted now that the modal is wired.
     const center = el('div', 'saa-tb-center');
     const upload = button('saa-tb-btn saa-tb-primary', 'Upload', actions.onUpload, '↑');
     center.append(upload);
+    if (actions.onCrop) {
+      const onCrop = actions.onCrop;
+      const crop = button('saa-tb-btn', 'Crop', () => onCrop(), '⌗');
+      this.sourceButtons.push(crop);
+      center.append(crop);
+    }
 
     // --- right: export ---
     const right = el('div', 'saa-tb-right');

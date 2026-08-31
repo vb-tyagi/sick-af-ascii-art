@@ -24,6 +24,7 @@ import './styles/fonts.css';
 import './styles/tokens.css';
 import './styles/shell.css';
 import './styles/sidebar.css';
+import './styles/crop.css';
 
 import { Renderer, type ModeRenderer } from '@sick-af/engine/renderer';
 import { glyphModes } from '@sick-af/engine/modes/glyph';
@@ -36,6 +37,8 @@ import { discoModes } from '@sick-af/engine/modes/disco';
 import { animatedModes } from '@sick-af/engine/animate';
 import { PostFxChain } from '@sick-af/engine/postfx/chain';
 import { MaskOverlay, EMPTY_MASK, type MaskState } from '@sick-af/engine/mask';
+import type { SourceMedia, SamplerTransform } from '@sick-af/engine/sample';
+import { createCropModal } from './ui/crop-modal';
 import { SourceLoader } from './io/source-loader';
 import { createSidebar, type SidebarState } from './ui/sidebar';
 import {
@@ -112,6 +115,7 @@ const loading = createLoadingIndicator(previewArea);
 
 const topbar = createTopbar(topbarMount, {
   onUpload: () => fileInput.click(),
+  onCrop: () => openCrop(),
   onExport: () => exportPng(),
 });
 
@@ -130,6 +134,11 @@ fileInput.addEventListener('change', () => {
 });
 
 loader.on('load', (event) => {
+  currentSource = event.element;
+  // A crop rect indexes the pixels of the image it was drawn on; carrying it
+  // onto a different one would slice an arbitrary region. Reset on every load.
+  currentTransform = {};
+  renderer.setOptions({ transform: currentTransform });
   renderer.setSource(event.element);
   renderer.markDirty();
   loading.hide();
@@ -185,6 +194,32 @@ function exportPng(): void {
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
     toaster.success('Exported PNG.');
   }, 'image/png');
+}
+
+// --- crop & rotate ---------------------------------------------------------
+// The modal emits a SamplerTransform (source-space crop + quarter turns), which
+// is exactly what GridSampler.sample consumes — no parallel path, nothing baked
+// into the renderer.
+let currentSource: SourceMedia | null = null;
+let currentTransform: SamplerTransform = {};
+
+const cropModal = createCropModal({
+  onApply: (transform) => {
+    currentTransform = transform;
+    renderer.setOptions({ transform });
+    renderer.markDirty();
+    toaster.success('Crop applied.');
+  },
+});
+
+function openCrop(): void {
+  if (!currentSource) {
+    toaster.info('Load an image or demo first.');
+    return;
+  }
+  // Seeded with the active transform so reopening edits the current crop
+  // instead of starting over.
+  cropModal.open(currentSource, currentTransform);
 }
 
 // Mask drawing surface: a transparent canvas over the preview. Pointer events
