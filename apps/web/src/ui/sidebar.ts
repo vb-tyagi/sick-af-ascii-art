@@ -21,12 +21,15 @@
  *    sidebar owns the controls, not the interpretation.
  */
 
-import type { Renderer, RenderOptions } from '@sick-af/engine/renderer';
+import type { Renderer } from '@sick-af/engine/renderer';
 import type { PostFxChain } from '@sick-af/engine/postfx/chain';
 import type { ColorFilter } from '@sick-af/engine/color';
 import { DEFAULT_TINT, type TintOptions, type BlendMode } from '@sick-af/engine/tint';
 import { DEFAULT_BACKDROP, type BackdropOptions, type BackdropMode } from '@sick-af/engine/backdrop';
 import { DEFAULT_LIGHTS, type LightsOptions } from '@sick-af/engine/lights';
+import { PALETTES } from '@sick-af/engine/palettes';
+import type { DitherAlgorithm, RGBTuple } from '@sick-af/engine/dither';
+import type { DitherRenderOptions } from '@sick-af/engine/modes/dither';
 
 /** Concrete family handed to the grid solver — must be a real measurable font, not a CSS var. */
 const FONT_FAMILY = '"JetBrains Mono", monospace';
@@ -128,6 +131,10 @@ export interface SidebarState {
   // Blur
   advBlurType: AdvBlurType;
   advBlurAmount: number;
+  // Dither (only meaningful while mode === 'dither')
+  ditherAlgorithm: DitherAlgorithm;
+  /** Registry key from PALETTES, or 'grey4'. Resolved to colours on flush. */
+  ditherPalette: string;
   // Animation
   animated: boolean;
   // Lights
@@ -159,10 +166,36 @@ export function initialState(): SidebarState {
     grayscale: 0,
     advBlurType: 'off',
     advBlurAmount: 35,
+    ditherAlgorithm: 'floyd-steinberg',
+    ditherPalette: 'mono',
     animated: false,
     lights: { ...DEFAULT_LIGHTS },
     maskEnabled: false,
   };
+}
+
+/**
+ * Every kernel the engine ships, ordered error-diffusion first (best tonal
+ * fidelity on stills) then the ordered/Bayer family (stateless, so cheap enough
+ * for video), then the plain threshold.
+ */
+const DITHER_ALGORITHMS: ReadonlyArray<{ value: DitherAlgorithm; label: string }> = [
+  { value: 'floyd-steinberg', label: 'Floyd–Steinberg' },
+  { value: 'atkinson', label: 'Atkinson' },
+  { value: 'burkes', label: 'Burkes' },
+  { value: 'sierra', label: 'Sierra' },
+  { value: 'sierra-lite', label: 'Sierra Lite' },
+  { value: 'stucki', label: 'Stucki' },
+  { value: 'jarvis', label: 'Jarvis–Judice–Ninke' },
+  { value: 'bayer2', label: 'Bayer 2×2 (ordered)' },
+  { value: 'bayer4', label: 'Bayer 4×4 (ordered)' },
+  { value: 'bayer8', label: 'Bayer 8×8 (ordered)' },
+  { value: 'threshold', label: 'Threshold (1-bit)' },
+];
+
+/** Palette key → sRGB colours; falls back to the first registry entry. */
+function resolvePalette(key: string): readonly RGBTuple[] {
+  return (PALETTES.find((p) => p.key === key) ?? PALETTES[0]).colors;
 }
 
 export interface SidebarConfig {
@@ -211,6 +244,8 @@ class SidebarController implements Sidebar {
   private frameHandle = 0;
   private fontDirty = true;
   private disposed = false;
+  /** Held so the section can be hidden unless the dither mode is selected. */
+  private ditherRoot?: HTMLDetailsElement;
 
   constructor(config: SidebarConfig) {
     this.renderer = config.renderer;
@@ -248,8 +283,15 @@ class SidebarController implements Sidebar {
 
   private flush(): void {
     const s = this.state;
-    const patch: Partial<RenderOptions> = {
+    // Typed as the dither-mode superset so `dither` threads through without an
+    // engine-side change: DitherRenderOptions extends RenderOptions, and the
+    // dither mode reads opts.dither. Other modes ignore the field.
+    const patch: Partial<DitherRenderOptions> = {
       mode: s.mode,
+      dither: {
+        algorithm: s.ditherAlgorithm,
+        palette: resolvePalette(s.ditherPalette),
+      },
       color: {
         brightness: s.brightness,
         contrast: s.contrast,
@@ -287,6 +329,7 @@ class SidebarController implements Sidebar {
     this.element.appendChild(header);
 
     this.element.appendChild(this.styleSection());
+    this.element.appendChild(this.ditherSection());
     this.element.appendChild(this.charactersSection());
     this.element.appendChild(this.intensitySection());
     this.element.appendChild(this.backdropSection());
@@ -461,9 +504,47 @@ class SidebarController implements Sidebar {
       STYLE_MODES.map((m) => ({ value: m.id, label: m.label })),
       (v) => {
         this.state.mode = v;
+        this.syncDitherVisibility();
       },
     );
     return root;
+  }
+
+  /**
+   * Dither controls. The engine ships eleven kernels and sixteen palettes; none
+   * of it was reachable before this section existed. Shown only for the dither
+   * mode — these options do nothing for the other fourteen, and a control that
+   * silently no-ops is worse than one that is absent.
+   */
+  private ditherSection(): HTMLElement {
+    const { root, body } = this.section('Dither', true);
+    this.ditherRoot = root;
+
+    this.select<DitherAlgorithm>(
+      body,
+      'Algorithm',
+      this.state.ditherAlgorithm,
+      DITHER_ALGORITHMS,
+      (v) => {
+        this.state.ditherAlgorithm = v;
+      },
+    );
+    this.select(
+      body,
+      'Palette',
+      this.state.ditherPalette,
+      PALETTES.map((p) => ({ value: p.key, label: p.name })),
+      (v) => {
+        this.state.ditherPalette = v;
+      },
+    );
+
+    this.syncDitherVisibility();
+    return root;
+  }
+
+  private syncDitherVisibility(): void {
+    if (this.ditherRoot) this.ditherRoot.hidden = this.state.mode !== 'dither';
   }
 
   private charactersSection(): HTMLElement {
