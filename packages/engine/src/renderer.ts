@@ -231,6 +231,39 @@ export class Renderer {
     this.markDirty();
   }
 
+  /**
+   * Render the current frame into a fresh offscreen canvas at `scale`x the
+   * on-screen size, through the SAME pipeline the preview uses.
+   *
+   * The grid is deliberately reused rather than re-solved: the export is the
+   * picture the user tuned, at higher resolution — not a finer grid with more,
+   * smaller glyphs, which would be a different composition. Scaling therefore
+   * enlarges each glyph instead of adding cells, and the result stays crisp
+   * because everything is re-rasterised at the target size rather than the
+   * bitmap being stretched.
+   */
+  renderToCanvas(scale = 1): HTMLCanvasElement {
+    const out = document.createElement('canvas');
+    out.width = Math.max(1, Math.round(this.cssW * scale));
+    out.height = Math.max(1, Math.round(this.cssH * scale));
+
+    const octx = out.getContext('2d');
+    if (!octx) throw new Error('2D context unavailable for export canvas');
+    if (!this.grid) return out;
+
+    // Layers of their own: reusing the live ones would clobber the on-screen
+    // frame mid-export.
+    const glyph = resizeLayer(null, out.width, out.height);
+    const backdrop = resizeLayer(null, out.width, out.height);
+    this.paint(octx, glyph, backdrop, this.grid, scale, out.width, out.height);
+    return out;
+  }
+
+  /** Logical (CSS-pixel) size of the output canvas — the 1x export baseline. */
+  get logicalSize(): { width: number; height: number } {
+    return { width: this.cssW, height: this.cssH };
+  }
+
   /** Request one repaint on the next frame. Cheap to call repeatedly. */
   markDirty(): void {
     this.dirty = true;
@@ -423,23 +456,43 @@ export class Renderer {
     const grid = this.grid;
     const glyph = this.glyphCtx;
     if (!grid || !glyph) return;
+    this.paint(this.ctx, glyph, this.backdropCtx, grid, this.dpr, this.canvas.width, this.canvas.height);
+  }
 
-    const ctx = this.ctx;
+  /**
+   * The one pipeline. `render()` runs it against the on-screen canvas at the
+   * device pixel ratio; `renderToCanvas()` runs it against an offscreen canvas
+   * at an export scale. There is deliberately no second implementation: an
+   * export path that re-derives these stages drifts out of step with the
+   * preview the moment either changes, and then the file no longer matches what
+   * the user tuned.
+   *
+   * `scale` plays exactly the role dpr plays on screen — the grid is unchanged,
+   * so the composition is identical and only the resolution rises.
+   */
+  private paint(
+    ctx: CanvasRenderingContext2D,
+    glyph: CanvasRenderingContext2D,
+    backdropCtx: CanvasRenderingContext2D | null,
+    grid: GridSpec,
+    dpr: number,
+    dw: number,
+    dh: number,
+  ): void {
     const mode = this.source ? this.registry.get(this.opts.mode) : undefined;
 
     if (!this.source || !mode) {
       // Nothing to composite — keep the pre-integration behaviour.
-      ctx.clearRect(0, 0, this.cssW, this.cssH);
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, dw, dh);
       if (this.opts.background) {
         ctx.fillStyle = this.opts.background;
-        ctx.fillRect(0, 0, this.cssW, this.cssH);
+        ctx.fillRect(0, 0, dw, dh);
       }
+      ctx.restore();
       return;
     }
-
-    const dpr = this.dpr;
-    const dw = this.canvas.width;
-    const dh = this.canvas.height;
 
     // 1. Sample at grid resolution. Advanced blur runs on the grid buffer
     //    before the pixel read — the §3.6 source stage, shaping glyph choice.
@@ -481,8 +534,8 @@ export class Renderer {
     //    cache makes this free for a still source at rest.
     let backdropSrc: string | CanvasImageSource | null = this.opts.background ?? null;
     const bopts = this.opts.backdrop;
-    if (bopts && bopts.mode !== 'none' && this.backdropCtx) {
-      const b = this.backdropCtx;
+    if (bopts && bopts.mode !== 'none' && backdropCtx) {
+      const b = backdropCtx;
       b.setTransform(1, 0, 0, 1, 0, 0);
       b.clearRect(0, 0, dw, dh);
       this.backdrop.paint(b, this.source, dw, dh, bopts);

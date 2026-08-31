@@ -25,6 +25,7 @@ import './styles/tokens.css';
 import './styles/shell.css';
 import './styles/sidebar.css';
 import './styles/crop.css';
+import './styles/export.css';
 
 import { Renderer, type ModeRenderer } from '@sick-af/engine/renderer';
 import { glyphModes } from '@sick-af/engine/modes/glyph';
@@ -39,6 +40,14 @@ import { PostFxChain } from '@sick-af/engine/postfx/chain';
 import { MaskOverlay, EMPTY_MASK, type MaskState } from '@sick-af/engine/mask';
 import type { SourceMedia, SamplerTransform } from '@sick-af/engine/sample';
 import { createCropModal } from './ui/crop-modal';
+import { createExportPopover } from './ui/export-popover';
+import {
+  encodeCanvas,
+  downloadBlob,
+  extensionFor,
+  type ExportFormat,
+  type ExportScale,
+} from './io/export-image';
 import { SourceLoader } from './io/source-loader';
 import { createSidebar, type SidebarState } from './ui/sidebar';
 import {
@@ -116,7 +125,7 @@ const loading = createLoadingIndicator(previewArea);
 const topbar = createTopbar(topbarMount, {
   onUpload: () => fileInput.click(),
   onCrop: () => openCrop(),
-  onExport: () => exportPng(),
+  onExport: () => openExport(),
 });
 
 const dropzone = createDropZone(previewArea, {
@@ -167,33 +176,42 @@ async function loadDemo(url: string): Promise<void> {
   }
 }
 
-// Export the current composited frame as a PNG. The renderer's output canvas
-// already holds the full pipeline result (backdrop, glyphs, post-FX, tint), so
-// this is full-fidelity — exactly what's on screen. Multi-scale re-render and
-// JPG are the perfection-pass follow-up; PNG is the right format for the crisp,
-// high-contrast glyphs anyway (JPEG would smear them).
-function exportPng(): void {
-  const canvas = renderer.canvas;
-  if (!canvas.width || !canvas.height) {
+// --- export ----------------------------------------------------------------
+// The renderer re-runs its ONE pipeline at the chosen scale, so the file is the
+// picture on screen at higher resolution — never an upscaled bitmap, and never
+// a second pipeline that could drift from the preview.
+
+const exportPopover = createExportPopover({
+  baseSize: () => renderer.logicalSize,
+  onExport: async (format, scale) => {
+    await runExport(format, scale);
+  },
+});
+
+function openExport(): void {
+  if (!currentSource) {
     toaster.info('Load an image or demo first.');
     return;
   }
-  canvas.toBlob((blob) => {
-    if (!blob) {
-      toaster.error('Export failed — could not encode the canvas.');
+  const anchor = [...document.querySelectorAll('#topbar-mount button')].find((b) =>
+    /export/i.test(b.textContent || ''),
+  ) as HTMLElement | undefined;
+  exportPopover.toggle(anchor);
+}
+
+async function runExport(format: ExportFormat, scale: ExportScale): Promise<void> {
+  try {
+    const canvas = renderer.renderToCanvas(scale);
+    if (!canvas.width || !canvas.height) {
+      toaster.info('Load an image or demo first.');
       return;
     }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `sick-af-ascii-art-${Date.now()}.png`;
-    a.click();
-    // Revoking synchronously races the browser's read of the object URL — some
-    // engines have not started the download yet and it silently fails. Hand the
-    // URL back on a later tick instead; the delay costs nothing.
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    toaster.success('Exported PNG.');
-  }, 'image/png');
+    const blob = await encodeCanvas(canvas, format);
+    downloadBlob(blob, `sick-af-ascii-art-${Date.now()}.${extensionFor(format)}`);
+    toaster.success(`Exported ${format.toUpperCase()} at ${canvas.width}x${canvas.height}.`);
+  } catch (err) {
+    toaster.error(`Export failed: ${err instanceof Error ? err.message : 'unknown error'}`);
+  }
 }
 
 // --- crop & rotate ---------------------------------------------------------
