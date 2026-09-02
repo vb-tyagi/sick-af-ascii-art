@@ -103,6 +103,10 @@
 .saa-dropzone {
   position: absolute;
   inset: 16px;
+  /* Above #output-canvas (z 60). The canvas fills the whole preview area when
+     no source is loaded, and although it is transparent it still hit-tests —
+     leaving this on `auto` makes the entire empty state unclickable. */
+  z-index: 70;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -148,7 +152,8 @@
   backdrop-filter: blur(2px);
   color: var(--saa-text);
   font-family: var(--font-ui);
-  z-index: 3;
+  /* Above the canvas (60) and the dropzone (70): it covers both while decoding. */
+  z-index: 80;
 }
 .saa-loading.is-hidden { display: none; }
 

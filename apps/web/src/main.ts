@@ -394,6 +394,9 @@ function openCrop(): void {
 const maskCanvas = document.createElement('canvas');
 maskCanvas.id = 'mask-overlay';
 maskCanvas.style.position = 'absolute';
+// Above the output canvas (z 60) so it can receive drawing pointer events when
+// masking is armed; below the dropzone (70) and loading (80).
+maskCanvas.style.zIndex = '65';
 maskCanvas.style.pointerEvents = 'none';
 previewArea.appendChild(maskCanvas);
 
